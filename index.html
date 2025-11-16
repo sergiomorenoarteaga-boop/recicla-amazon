@@ -2,10 +2,9 @@
 <html>
 <head>
     <title>Juego de Reciclaje - Amazon</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
         :root {
-            /* Variables que se ajustarán automáticamente */
             --scale: 1;
             --bins-height: calc(170px * var(--scale));
             --vh: 1vh;
@@ -15,6 +14,16 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
+        }
+
+        .item {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #bins-container {
+            touch-action: none;
         }
 
         body {
@@ -108,7 +117,7 @@
             margin: calc(20px * var(--scale)) auto;
             max-width: calc(1200px * var(--scale));
             min-height: calc(var(--vh) * 50);
-            margin-bottom: calc(var(--bins-height) + 20px * var(--scale));
+            margin-bottom: c: calc(var(--bins-height) + 20px * var(--scale));
         }
 
         .item {
@@ -391,47 +400,38 @@
     </div>
 
     <script>
-        // Función simple para ajustar todo el tamaño
         function adjustScale() {
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
-            
-            // Calcular escala basada en el ancho de la pantalla
             let scale = 1;
             
             if (screenWidth <= 480) {
-                scale = 0.5;  // Pantallas muy pequeñas
+                scale = 0.5;
             } else if (screenWidth <= 768) {
-                scale = 0.7;  // Tablets pequeñas
+                scale = 0.7;
             } else if (screenWidth <= 1024) {
-                scale = 0.8;  // Tablets
+                scale = 0.8;
             } else if (screenWidth <= 1200) {
-                scale = 0.9;  // Pantallas medianas
+                scale = 0.9;
             } else {
-                scale = 1;    // Pantallas grandes
+                scale = 1;
             }
             
-            // Si la pantalla es muy baja, reducir más la escala
             if (screenHeight < 600) {
                 scale *= 0.8;
             }
             
-            // Aplicar la escala
             document.documentElement.style.setProperty('--scale', scale);
-            
-            // Ajustar altura del viewport
             let vh = window.innerHeight * 0.01;
             document.documentElement.style.setProperty('--vh', `${vh}px`);
         }
 
-        // Ejecutar al cargar y al cambiar tamaño
         window.addEventListener('load', adjustScale);
         window.addEventListener('resize', adjustScale);
         window.addEventListener('orientationchange', () => {
             setTimeout(adjustScale, 100);
         });
 
-        // Ejecutar inmediatamente
         adjustScale();
 
         const items = [
@@ -441,7 +441,7 @@
             { name: 'Papel relleno', type: 'blue', image: 'item-papel.png', description: 'Papel de relleno' },
             { name: 'Cajas', type: 'blue', image: 'item-cajas.png', description: 'Cajas de cartón' },
             { name: 'Bolsas', type: 'blue', image: 'item-bolsas.png', description: 'Bolsas de papel' },
-            { name: 'Water tape', type: 'blue', image: 'item-watertape.png', description: 'Cinta adhesiva de agua' },
+            { name: 'Water tape', type: 'blue', image: 'item-watertape.pe.png', description: 'Cinta adhesiva de agua' },
             { name: 'Plástico', type: 'yellow', image: 'item-plastico.png', description: 'Plástico general' },
             { name: 'Plástico duro', type: 'yellow-black', image: 'item-plastico-duro.png', description: 'Plástico resistente' },
             { name: 'Etiquetas', type: 'brown', image: 'item-etiquetas.png', description: 'Etiquetas generales' },
@@ -454,6 +454,37 @@
         let gameInterval;
         let usedItems = new Set();
         let mistakes = [];
+
+        function getDistance(x1, y1, x2, y2) {
+            return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        }
+
+        function handleDrop(itemElement, bin) {
+            const itemType = itemElement.dataset.type;
+            const itemName = itemElement.querySelector('.name').textContent;
+            const correct = bin.id === itemType;
+
+            if (correct) {
+                score.correct++;
+                bin.style.boxShadow = '0 0 20px #4CAF50';
+            } else {
+                score.incorrect++;
+                bin.style.boxShadow = '0 0 20px #f44336';
+                mistakes.push({
+                    item: itemName,
+                    wrongBin: bin.querySelector('.label').textContent,
+                    correctBin: getCorrectBinName(itemType)
+                });
+            }
+
+            setTimeout(() => {
+                bin.style.boxShadow = 'none';
+            }, 500);
+
+            updateScore();
+            itemElement.remove();
+            createItem();
+        }
 
         function createItem() {
             if (usedItems.size >= items.length) {
@@ -473,12 +504,71 @@
             const itemDiv = document.createElement('div');
             itemDiv.className = 'item';
             itemDiv.draggable = true;
-            itemDiv.innerHTML = `
-                <img src="${randomItem.image}" alt="${randomItem.name}" draggable="false">
-                <div class="name">${randomItem.name}</div>
-            `;
             itemDiv.dataset.type = randomItem.type;
 
+            // Variables para el manejo touch
+            let startX, startY, initialX, initialY;
+            let active = false;
+
+            // Eventos touch
+            itemDiv.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                startX = touch.pageX - itemDiv.offsetLeft;
+                startY = touch.pageY - itemDiv.offsetTop;
+                
+                active = true;
+                itemDiv.style.position = 'absolute';
+                itemDiv.style.zIndex = '1000';
+            });
+
+            itemDiv.addEventListener('touchmove', function(e) {
+                if (active) {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    
+                    const currentX = touch.pageX - startX;
+                    const currentY = touch.pageY - startY;
+
+                    itemDiv.style.left = currentX + 'px';
+                    itemDiv.style.top = currentY + 'px';
+                }
+            });
+
+            itemDiv.addEventListener('touchend', function(e) {
+                active = false;
+                
+                const bins = document.querySelectorAll('.bin');
+                const itemRect = itemDiv.getBoundingClientRect();
+                
+                let closestBin = null;
+                let minDistance = Infinity;
+
+                bins.forEach(bin => {
+                    const binRect = bin.getBoundingClientRect();
+                    const distance = getDistance(
+                        itemRect.left + itemRect.width/2,
+                        itemRect.top + itemRect.height/2,
+                        binRect.left + binRect.width/2,
+                        binRect.top + binRect.height/2
+                    );
+                    
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestBin = bin;
+                    }
+                });
+
+                if (minDistance < 100) {
+                    handleDrop(itemDiv, closestBin);
+                } else {
+                    itemDiv.style.position = 'relative';
+                    itemDiv.style.left = 'auto';
+                    itemDiv.style.top = 'auto';
+                }
+            });
+
+            // Eventos drag and drop tradicionales
             itemDiv.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', randomItem.type);
                 e.target.style.opacity = '0.5';
@@ -487,6 +577,11 @@
             itemDiv.addEventListener('dragend', (e) => {
                 e.target.style.opacity = '1';
             });
+
+            itemDiv.innerHTML = `
+                <img src="${randomItem.image}" alt="${randomItem.name}" draggable="false">
+                <div class="name">${randomItem.name}</div>
+            `;
 
             document.getElementById('items-container').appendChild(itemDiv);
         }
@@ -508,29 +603,7 @@
                     bin.style.transform = 'scale(1)';
                     const itemType = e.dataTransfer.getData('text/plain');
                     const itemElement = document.querySelector(`[data-type="${itemType}"]`);
-                    const itemName = itemElement.querySelector('.name').textContent;
-                    const correct = bin.id === itemType;
-
-                    if (correct) {
-                        score.correct++;
-                        bin.style.boxShadow = '0 0 20px #4CAF50';
-                    } else {
-                        score.incorrect++;
-                        bin.style.boxShadow = '0 0 20px #f44336';
-                        mistakes.push({
-                            item: itemName,
-                            wrongBin: bin.querySelector('.label').textContent,
-                            correctBin: getCorrectBinName(itemType)
-                        });
-                    }
-
-                    setTimeout(() => {
-                        bin.style.boxShadow = 'none';
-                    }, 500);
-
-                    updateScore();
-                    itemElement.remove();
-                    createItem();
+                    handleDrop(itemElement, bin);
                 });
             });
         }
@@ -551,21 +624,6 @@
         function updateScore() {
             document.getElementById('score').textContent = 
                 `Aciertos: ${score.correct} | Fallos: ${score.incorrect}`;
-        }
-
-        function startGame() {
-            for(let i = 0; i < 4; i++) {
-                createItem();
-            }
-
-            gameInterval = setInterval(() => {
-                timeLeft--;
-                document.getElementById('timer').textContent = `Tiempo: ${timeLeft}s`;
-
-                if (timeLeft <= 0) {
-                    endGame();
-                }
-            }, 1000);
         }
 
         function createConfetti() {
@@ -630,6 +688,21 @@
             setTimeout(() => {
                 modal.scrollTo(0, 0);
             }, 100);
+        }
+
+        function startGame() {
+            for(let i = 0; i < 4; i++) {
+                createItem();
+            }
+
+            gameInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').textContent = `Tiempo: ${timeLeft}s`;
+
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
         }
 
         function restartGame() {
