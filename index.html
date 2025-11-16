@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Juego de Reciclaje - Amazon</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        :root {
+            /* Variables que se ajustarán automáticamente */
+            --scale: 1;
+            --bins-height: calc(170px * var(--scale));
+            --vh: 1vh;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: #e0f7fa;
+            font-family: Arial, sans-serif;
+            min-height: calc(var(--vh) * 100);
+            display: flex;
+            flex-direction: column;
+            background-image: url('https://logos-world.net/wp-content/uploads/2020/04/Amazon-Logo.png');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: calc(300px * var(--scale));
+            background-attachment: fixed;
+            background-blend-mode: lighten;
+            background-color: rgba(255, 255, 255, 0.9);
+            overflow-x: hidden;
+        }
+
+        #game-container {
+            width: 100%;
+            max-width: calc(1400px * var(--scale));
+            margin: 0 auto;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+            padding: calc(20px * var(--scale));
+            padding-bottom: calc(var(--bins-height) + 40px * var(--scale));
+            min-height: calc(var(--vh) * 100);
+        }
+
+        h1 {
+            font-size: calc(48px * var(--scale));
+            margin: calc(20px * var(--scale));
+            padding: calc(20px * var(--scale));
+            border-radius: calc(15px * var(--scale));
+            position: relative;
+            z-index: 1;
+            color: #232f3e;
+            text-shadow: calc(2px * var(--scale)) calc(2px * var(--scale)) calc(4px * var(--scale)) rgba(0,0,0,0.3);
+        }
+
+        h1::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #ffd700, #ff9900);
+            border-radius: calc(15px * var(--scale));
+            z-index: -1;
+            transform: skew(-5deg);
+            animation: titleFloat 3s ease-in-out infinite;
+            opacity: 0.9;
+        }
+
+        #status-container {
+            display: flex;
+            justify-content: center;
+            gap: calc(20px * var(--scale));
+            flex-wrap: wrap;
+            margin-bottom: calc(20px * var(--scale));
+            padding: 0 calc(10px * var(--scale));
+        }
+
+        #timer, #score {
+            background: linear-gradient(45deg, #4CAF50, #2196F3);
+            color: white;
+            padding: calc(15px * var(--scale)) calc(30px * var(--scale));
+            border-radius: calc(25px * var(--scale));
+            font-size: calc(24px * var(--scale));
+            font-weight: bold;
+            box-shadow: 0 calc(4px * var(--scale)) calc(15px * var(--scale)) rgba(0,0,0,0.2);
+            animation: pulse 2s infinite;
+            text-shadow: calc(2px * var(--scale)) calc(2px * var(--scale)) calc(4px * var(--scale)) rgba(0,0,0,0.3);
+            border: calc(3px * var(--scale)) solid #fff;
+        }
+
+        #timer {
+            background: linear-gradient(45deg, #FF5722, #FF9800);
+        }
+
+        #items-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(calc(150px * var(--scale)), 1fr));
+            gap: calc(30px * var(--scale));
+            justify-items: center;
+            padding: calc(20px * var(--scale));
+            margin: calc(20px * var(--scale)) auto;
+            max-width: calc(1200px * var(--scale));
+            min-height: calc(var(--vh) * 50);
+            margin-bottom: calc(var(--bins-height) + 20px * var(--scale));
+        }
+
+        .item {
+            width: calc(150px * var(--scale));
+            height: calc(150px * var(--scale));
+            cursor: pointer;
+            position: relative;
+            perspective: 1000px;
+            background: white;
+            border-radius: calc(10px * var(--scale));
+            box-shadow: 0 calc(4px * var(--scale)) calc(8px * var(--scale)) rgba(0,0,0,0.1);
+            transition: transform 0.3s;
+        }
+
+        .item:hover {
+            transform: scale(1.1) rotate(5deg);
+            z-index: 2;
+        }
+
+        .item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: calc(10px * var(--scale));
+            padding: calc(5px * var(--scale));
+        }
+
+        .item .name {
+            position: absolute;
+            bottom: calc(-25px * var(--scale));
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: calc(14px * var(--scale));
+            font-weight: bold;
+            color: #333;
+            text-shadow: calc(1px * var(--scale)) calc(1px * var(--scale)) calc(2px * var(--scale)) rgba(255,255,255,0.8);
+            background: rgba(255,255,255,0.9);
+            padding: calc(3px * var(--scale));
+            border-radius: calc(5px * var(--scale));
+        }
+
+        #bins-container {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: calc(20px * var(--scale));
+            padding: calc(10px * var(--scale));
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(255,255,255,0.95);
+            box-shadow: 0 calc(-2px * var(--scale)) calc(10px * var(--scale)) rgba(0,0,0,0.1);
+            height: var(--bins-height);
+            z-index: 1000;
+            max-width: calc(1400px * var(--scale));
+            margin: 0 auto;
+        }
+
+        .bin {
+            height: calc((170px - 20px) * var(--scale));
+            width: calc(140px * var(--scale));
+            margin: 0 auto;
+            position: relative;
+            transition: transform 0.3s;
+        }
+
+        .bin:hover {
+            transform: scale(1.1);
+            z-index: 2;
+        }
+
+        .bin img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .bin .label {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: calc(5px * var(--scale));
+            font-size: calc(14px * var(--scale));
+            border-radius: calc(5px * var(--scale));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .bin:hover .label {
+            opacity: 1;
+        }
+
+        .trophy {
+            width: calc(200px * var(--scale));
+            height: auto;
+            display: none;
+            margin: calc(20px * var(--scale)) auto;
+            animation: trophyAppear 1s ease-out;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            z-index: 2000;
+            overflow-y: auto;
+            padding: calc(20px * var(--scale));
+        }
+
+        .modal-content {
+            position: relative;
+            background: linear-gradient(135deg, #ffffff, #f5f5f5);
+            margin: 5% auto;
+            padding: calc(30px * var(--scale));
+            width: 90%;
+            max-width: calc(600px * var(--scale));
+            border-radius: calc(20px * var(--scale));
+            animation: modalOpen 0.5s;
+            text-align: center;
+            box-shadow: 0 calc(5px * var(--scale)) calc(25px * var(--scale)) rgba(0,0,0,0.2);
+        }
+
+        #finalTitle {
+            color: #232f3e;
+            font-size: calc(28px * var(--scale));
+            margin-bottom: calc(20px * var(--scale));
+            background: linear-gradient(45deg, #ff9900, #232f3e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            padding: calc(10px * var(--scale));
+        }
+
+        .final-score {
+            font-size: calc(24px * var(--scale));
+            margin: calc(20px * var(--scale)) 0;
+            padding: calc(15px * var(--scale));
+            background: linear-gradient(45deg, #2196f3, #00bcd4);
+            color: white;
+            border-radius: calc(15px * var(--scale));
+            box-shadow: 0 calc(3px * var(--scale)) calc(10px * var(--scale)) rgba(0,0,0,0.1);
+        }
+
+        .error-list {
+            text-align: left;
+            margin: calc(20px * var(--scale)) 0;
+            padding: calc(20px * var(--scale));
+            background-color: #fff3e0;
+            border-radius: calc(15px * var(--scale));
+            box-shadow: 0 calc(3px * var(--scale)) calc(10px * var(--scale)) rgba(0,0,0,0.1);
+            max-height: calc(300px * var(--scale));
+            overflow-y: auto;
+        }
+
+        .error-item {
+            color: #d32f2f;
+            margin: calc(12px * var(--scale)) 0;
+            font-size: calc(16px * var(--scale));
+            padding: calc(10px * var(--scale));
+            background-color: rgba(211, 47, 47, 0.1);
+            border-radius: calc(8px * var(--scale));
+        }
+
+        .restart-button {
+            background: linear-gradient(45deg, #ff9900, #f57c00);
+            color: white;
+            padding: calc(15px * var(--scale)) calc(40px * var(--scale));
+            border: none;
+            border-radius: calc(50px * var(--scale));
+            font-size: calc(20px * var(--scale));
+            cursor: pointer;
+            margin: calc(20px * var(--scale));
+            transition: all 0.3s ease;
+            box-shadow: 0 calc(4px * var(--scale)) calc(15px * var(--scale)) rgba(0,0,0,0.2);
+        }
+
+        .restart-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 calc(6px * var(--scale)) calc(20px * var(--scale)) rgba(0,0,0,0.3);
+        }
+
+        @keyframes trophyAppear {
+            from {
+                transform: scale(0) rotate(720deg);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        @keyframes modalOpen {
+            from { transform: scale(0.7); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes titleFloat {
+            0%, 100% { transform: skew(-5deg) translateY(0); }
+            50% { transform: skew(-5deg) translateY(-10px); }
+        }
+
+        .confetti {
+            position: fixed;
+            width: calc(10px * var(--scale));
+            height: calc(10px * var(--scale));
+            background-color: #f00;
+            animation: confetti-fall 3s linear infinite;
+        }
+
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100vh) rotate(0deg); }
+            100% { transform: translateY(100vh) rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <h1>Juego de Reciclaje Amazon</h1>
+        <div id="status-container">
+            <div id="timer">Tiempo: 30s</div>
+            <div id="score">Aciertos: 0 | Fallos: 0</div>
+        </div>
+        
+        <div id="items-container"></div>
+        
+        <div id="bins-container">
+            <div class="bin" id="transparent-flejes">
+                <img src="bin-flejes.png" alt="Contenedor Flejes">
+                <div class="label">Flejes</div>
+            </div>
+            <div class="bin" id="transparent-parafina">
+                <img src="bin-parafina.png" alt="Contenedor Parafina">
+                <div class="label">Parafina</div>
+            </div>
+            <div class="bin" id="blue">
+                <img src="bin-blue.png" alt="Contenedor Azul">
+                <div class="label">Cartón/Papel</div>
+            </div>
+            <div class="bin" id="yellow">
+                <img src="bin-yellow.png" alt="Contenedor Amarillo">
+                <div class="label">Plástico</div>
+            </div>
+            <div class="bin" id="yellow-black">
+                <img src="bin-yellow-black.png" alt="Contenedor Amarillo/Negro">
+                <div class="label">Plástico Duro</div>
+            </div>
+            <div class="bin" id="brown">
+                <img src="bin-brown.png" alt="Contenedor Marrón">
+                <div class="label">Banal</div>
+            </div>
+            <div class="bin" id="confidential">
+                <img src="bin-confidential.png" alt="Contenedor Confidencial">
+                <div class="label">Confidencial</div>
+            </div>
+        </div>
+
+        <div id="endGameModal" class="modal">
+            <div class="modal-content">
+                <h2 id="finalTitle"></h2>
+                <img src="trophy.png" id="trophy" class="trophy" alt="Trofeo">
+                <div id="finalScore" class="final-score"></div>
+                <div id="errorList" class="error-list"></div>
+                <button class="restart-button" onclick="restartGame()">¡Jugar de nuevo!</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Función simple para ajustar todo el tamaño
+        function adjustScale() {
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            
+            // Calcular escala basada en el ancho de la pantalla
+            let scale = 1;
+            
+            if (screenWidth <= 480) {
+                scale = 0.5;  // Pantallas muy pequeñas
+            } else if (screenWidth <= 768) {
+                scale = 0.7;  // Tablets pequeñas
+            } else if (screenWidth <= 1024) {
+                scale = 0.8;  // Tablets
+            } else if (screenWidth <= 1200) {
+                scale = 0.9;  // Pantallas medianas
+            } else {
+                scale = 1;    // Pantallas grandes
+            }
+            
+            // Si la pantalla es muy baja, reducir más la escala
+            if (screenHeight < 600) {
+                scale *= 0.8;
+            }
+            
+            // Aplicar la escala
+            document.documentElement.style.setProperty('--scale', scale);
+            
+            // Ajustar altura del viewport
+            let vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+
+        // Ejecutar al cargar y al cambiar tamaño
+        window.addEventListener('load', adjustScale);
+        window.addEventListener('resize', adjustScale);
+        window.addEventListener('orientationchange', () => {
+            setTimeout(adjustScale, 100);
+        });
+
+        // Ejecutar inmediatamente
+        adjustScale();
+
+        const items = [
+            { name: 'Flejes', type: 'transparent-flejes', image: 'item-flejes.png', description: 'Tiras plásticas para embalaje' },
+            { name: 'Parafina', type: 'transparent-parafina', image: 'item-parafina.png', description: 'Base de pegatina' },
+            { name: 'Cartón', type: 'blue', image: 'item-carton.png', description: 'Cajas y material de cartón' },
+            { name: 'Papel relleno', type: 'blue', image: 'item-papel.png', description: 'Papel de relleno' },
+            { name: 'Cajas', type: 'blue', image: 'item-cajas.png', description: 'Cajas de cartón' },
+            { name: 'Bolsas', type: 'blue', image: 'item-bolsas.png', description: 'Bolsas de papel' },
+            { name: 'Water tape', type: 'blue', image: 'item-watertape.png', description: 'Cinta adhesiva de agua' },
+            { name: 'Plástico', type: 'yellow', image: 'item-plastico.png', description: 'Plástico general' },
+            { name: 'Plástico duro', type: 'yellow-black', image: 'item-plastico-duro.png', description: 'Plástico resistente' },
+            { name: 'Etiquetas', type: 'brown', image: 'item-etiquetas.png', description: 'Etiquetas generales' },
+            { name: 'Papel slam', type: 'brown', image: 'item-slam.png', description: 'Papel de slam' },
+            { name: 'Datos personales', type: 'confidential', image: 'item-confidential.png', description: 'Documentos confidenciales' }
+        ];
+
+        let score = { correct: 0, incorrect: 0 };
+        let timeLeft = 30;
+        let gameInterval;
+        let usedItems = new Set();
+        let mistakes = [];
+
+        function createItem() {
+            if (usedItems.size >= items.length) {
+                endGame();
+                return;
+            }
+
+            let availableItems = items.filter(item => !usedItems.has(item.name));
+            if (availableItems.length === 0) {
+                endGame();
+                return;
+            }
+
+            const randomItem = availableItems[Math.floor(Math.random() * availableItems.length)];
+            usedItems.add(randomItem.name);
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'item';
+            itemDiv.draggable = true;
+            itemDiv.innerHTML = `
+                <img src="${randomItem.image}" alt="${randomItem.name}" draggable="false">
+                <div class="name">${randomItem.name}</div>
+            `;
+            itemDiv.dataset.type = randomItem.type;
+
+            itemDiv.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', randomItem.type);
+                e.target.style.opacity = '0.5';
+            });
+
+            itemDiv.addEventListener('dragend', (e) => {
+                e.target.style.opacity = '1';
+            });
+
+            document.getElementById('items-container').appendChild(itemDiv);
+        }
+
+        function setupBins() {
+            const bins = document.querySelectorAll('.bin');
+            bins.forEach(bin => {
+                bin.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    bin.style.transform = 'scale(1.1)';
+                });
+
+                bin.addEventListener('dragleave', (e) => {
+                    bin.style.transform = 'scale(1)';
+                });
+
+                bin.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    bin.style.transform = 'scale(1)';
+                    const itemType = e.dataTransfer.getData('text/plain');
+                    const itemElement = document.querySelector(`[data-type="${itemType}"]`);
+                    const itemName = itemElement.querySelector('.name').textContent;
+                    const correct = bin.id === itemType;
+
+                    if (correct) {
+                        score.correct++;
+                        bin.style.boxShadow = '0 0 20px #4CAF50';
+                    } else {
+                        score.incorrect++;
+                        bin.style.boxShadow = '0 0 20px #f44336';
+                        mistakes.push({
+                            item: itemName,
+                            wrongBin: bin.querySelector('.label').textContent,
+                            correctBin: getCorrectBinName(itemType)
+                        });
+                    }
+
+                    setTimeout(() => {
+                        bin.style.boxShadow = 'none';
+                    }, 500);
+
+                    updateScore();
+                    itemElement.remove();
+                    createItem();
+                });
+            });
+        }
+
+        function getCorrectBinName(type) {
+            const binTypes = {
+                'transparent-flejes': 'Contenedor Flejes',
+                'transparent-parafina': 'Contenedor Parafina',
+                'blue': 'Contenedor Azul (Cartón/Papel)',
+                'yellow': 'Contenedor Amarillo (Plástico)',
+                'yellow-black': 'Contenedor Amarillo/Negro (Plástico duro)',
+                'brown': 'Contenedor Marrón (Banal)',
+                'confidential': 'Contenedor Confidencial'
+            };
+            return binTypes[type];
+        }
+
+        function updateScore() {
+            document.getElementById('score').textContent = 
+                `Aciertos: ${score.correct} | Fallos: ${score.incorrect}`;
+        }
+
+        function startGame() {
+            for(let i = 0; i < 4; i++) {
+                createItem();
+            }
+
+            gameInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer').textContent = `Tiempo: ${timeLeft}s`;
+
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function createConfetti() {
+            for (let i = 0; i < 50; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.animationDelay = Math.random() * 3 + 's';
+                confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                document.body.appendChild(confetti);
+
+                setTimeout(() => confetti.remove(), 3000);
+            }
+        }
+
+        function endGame() {
+            clearInterval(gameInterval);
+            const total = score.correct + score.incorrect;
+            const percentage = total > 0 ? (score.correct / total) * 100 : 0;
+
+            const modal = document.getElementById('endGameModal');
+            const titleElement = document.getElementById('finalTitle');
+            const scoreElement = document.getElementById('finalScore');
+            const errorList = document.getElementById('errorList');
+            const trophy = document.getElementById('trophy');
+
+            errorList.innerHTML = '';
+
+            if (timeLeft > 0) {
+                titleElement.innerHTML = '🎯 ¡Has clasificado todos los objetos!';
+            } else {
+                titleElement.innerHTML = '⏰ ¡Se acabó el tiempo!';
+            }
+
+            if (score.correct >= 10 && percentage >= 90) {
+                titleElement.innerHTML += '<br>🏆 ¡Eres un experto en reciclaje! 🎉';
+                trophy.style.display = 'block';
+                createConfetti();
+            } else {
+                trophy.style.display = 'none';
+            }
+
+            scoreElement.innerHTML = `
+                <div style="margin: 10px 0;">✅ Aciertos: ${score.correct}</div>
+                <div style="margin: 10px 0;">❌ Fallos: ${score.incorrect}</div>
+                <div style="margin: 10px 0;">📊 Porcentaje de aciertos: ${percentage.toFixed(1)}%</div>
+                ${timeLeft > 0 ? `<div style="margin: 10px 0;">⏱️ Tiempo restante: ${timeLeft}s</div>` : ''}
+            `;
+
+            if (mistakes.length > 0) {
+                errorList.innerHTML = '<h3>📋 Errores cometidos:</h3>';
+                mistakes.forEach(mistake => {
+                    const errorItem = document.createElement('div');
+                    errorItem.className = 'error-item';
+                    errorItem.innerHTML = `❌ "${mistake.item}" no va en ${mistake.wrongBin}, va en ${mistake.correctBin}`;
+                    errorList.appendChild(errorItem);
+                });
+            }
+
+            modal.style.display = 'block';
+            
+            setTimeout(() => {
+                modal.scrollTo(0, 0);
+            }, 100);
+        }
+
+        function restartGame() {
+            score = { correct: 0, incorrect: 0 };
+            timeLeft = 30;
+            usedItems = new Set();
+            mistakes = [];
+            
+            document.getElementById('items-container').innerHTML = '';
+            document.getElementById('endGameModal').style.display = 'none';
+            document.getElementById('trophy').style.display = 'none';
+            
+            updateScore();
+            document.getElementById('timer').textContent = 'Tiempo: 30s';
+            
+            startGame();
+        }
+
+        setupBins();
+        startGame();
+    </script>
+</body>
+</html>
