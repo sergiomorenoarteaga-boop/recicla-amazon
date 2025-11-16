@@ -400,6 +400,153 @@
     </div>
 
     <script>
+// Variables globales para la selección
+let selectedItem = null;
+let itemsContainer = document.getElementById('items-container');
+let binsContainer = document.getElementById('bins-container');
+
+function handleItemSelection(itemDiv) {
+    // Si ya hay un item seleccionado, lo deseleccionamos
+    if (selectedItem) {
+        selectedItem.style.transform = 'scale(1)';
+        selectedItem.style.boxShadow = 'none';
+    }
+
+    // Si hacemos clic en el mismo item, lo deseleccionamos
+    if (selectedItem === itemDiv) {
+        selectedItem = null;
+        return;
+    }
+
+    // Seleccionamos el nuevo item
+    selectedItem = itemDiv;
+    selectedItem.style.transform = 'scale(1.1)';
+    selectedItem.style.boxShadow = '0 0 20px #4CAF50';
+}
+
+function modifyCreateItem() {
+    const originalCreateItem = createItem;
+    createItem = function() {
+        const itemDiv = originalCreateItem.apply(this, arguments);
+        
+        // Añadir evento de doble clic/toque
+        itemDiv.addEventListener('dblclick', function(e) {
+            e.preventDefault();
+            handleItemSelection(this);
+        });
+
+        // Para dispositivos táctiles
+        let lastTap = 0;
+        itemDiv.addEventListener('touchend', function(e) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            if (tapLength < 500 && tapLength > 0) {
+                e.preventDefault();
+                handleItemSelection(this);
+            }
+            lastTap = currentTime;
+        });
+
+        return itemDiv;
+    };
+}
+
+function modifySetupBins() {
+    const bins = document.querySelectorAll('.bin');
+    bins.forEach(bin => {
+        // Añadir evento de clic para los contenedores
+        bin.addEventListener('click', function() {
+            if (selectedItem) {
+                handleDrop(selectedItem, this);
+                selectedItem = null;
+            }
+        });
+
+        // Para dispositivos táctiles
+        bin.addEventListener('touchend', function(e) {
+            e.preventDefault();
+            if (selectedItem) {
+                handleDrop(selectedItem, this);
+                selectedItem = null;
+            }
+        });
+    });
+}
+
+// Modificar la función createItem para incluir la nueva funcionalidad
+function createItem() {
+    if (usedItems.size >= items.length) {
+        endGame();
+        return;
+    }
+
+    let availableItems = items.filter(item => !usedItems.has(item.name));
+    if (availableItems.length === 0) {
+        endGame();
+        return;
+    }
+
+    const randomItem = availableItems[Math.floor(Math.random() * availableItems.length)];
+    usedItems.add(randomItem.name);
+
+    const itemDiv = document.createElement('div');
+    itemDiv.className = 'item';
+    itemDiv.draggable = true;
+    itemDiv.dataset.type = randomItem.type;
+
+    // Mantener los eventos touch y drag existentes...
+    // [Todo el código existente de eventos touch y drag aquí]
+
+    // Añadir eventos de doble clic/toque
+    itemDiv.addEventListener('dblclick', function(e) {
+        e.preventDefault();
+        handleItemSelection(this);
+    });
+
+    let lastTap = 0;
+    itemDiv.addEventListener('touchend', function(e) {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+        if (tapLength < 500 && tapLength > 0) {
+            e.preventDefault();
+            handleItemSelection(this);
+        }
+        lastTap = currentTime;
+    });
+
+    itemDiv.innerHTML = `
+        <img src="${randomItem.image}" alt="${randomItem.name}" draggable="false">
+        <div class="name">${randomItem.name}</div>
+    `;
+
+    document.getElementById('items-container').appendChild(itemDiv);
+    return itemDiv;
+}
+
+// Añadir estos estilos al CSS existente
+const style = document.createElement('style');
+style.textContent = `
+    .item.selected {
+        transform: scale(1.1);
+        box-shadow: 0 0 20px #4CAF50;
+        z-index: 1000;
+    }
+
+    .bin.highlight {
+        transform: scale(1.1);
+        box-shadow: 0 0 20px #2196F3;
+    }
+`;
+document.head.appendChild(style);
+
+// Modificar la función setupBins existente
+const originalSetupBins = setupBins;
+setupBins = function() {
+    originalSetupBins();
+    modifySetupBins();
+};
+
+
         function adjustScale() {
             const screenWidth = window.innerWidth;
             const screenHeight = window.innerHeight;
