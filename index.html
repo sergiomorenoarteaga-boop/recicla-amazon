@@ -117,7 +117,7 @@
             margin: calc(20px * var(--scale)) auto;
             max-width: calc(1200px * var(--scale));
             min-height: calc(var(--vh) * 50);
-            margin-bottom: c: calc(var(--bins-height) + 20px * var(--scale));
+            margin-bottom: calc(var(--bins-height) + 20px * var(--scale));
         }
 
         .item {
@@ -158,6 +158,13 @@
             background: rgba(255,255,255,0.9);
             padding: calc(3px * var(--scale));
             border-radius: calc(5px * var(--scale));
+        }
+
+        .item.selected {
+            transform: scale(1.15) !important;
+            box-shadow: 0 0 25px #4CAF50 !important;
+            z-index: 1000 !important;
+            border: 3px solid #4CAF50;
         }
 
         #bins-container {
@@ -212,6 +219,10 @@
 
         .bin:hover .label {
             opacity: 1;
+        }
+
+        .bin.highlight {
+            animation: binPulse 0.5s ease-in-out infinite;
         }
 
         .trophy {
@@ -333,6 +344,11 @@
             50% { transform: skew(-5deg) translateY(-10px); }
         }
 
+        @keyframes binPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); box-shadow: 0 0 25px #2196F3; }
+        }
+
         .confetti {
             position: fixed;
             width: calc(10px * var(--scale));
@@ -400,152 +416,28 @@
     </div>
 
     <script>
-// Variables globales para la selección
-let selectedItem = null;
-let itemsContainer = document.getElementById('items-container');
-let binsContainer = document.getElementById('bins-container');
+        // Variables globales
+        let selectedItem = null;
+        let score = { correct: 0, incorrect: 0 };
+        let timeLeft = 30;
+        let gameInterval;
+        let usedItems = new Set();
+        let mistakes = [];
 
-function handleItemSelection(itemDiv) {
-    // Si ya hay un item seleccionado, lo deseleccionamos
-    if (selectedItem) {
-        selectedItem.style.transform = 'scale(1)';
-        selectedItem.style.boxShadow = 'none';
-    }
-
-    // Si hacemos clic en el mismo item, lo deseleccionamos
-    if (selectedItem === itemDiv) {
-        selectedItem = null;
-        return;
-    }
-
-    // Seleccionamos el nuevo item
-    selectedItem = itemDiv;
-    selectedItem.style.transform = 'scale(1.1)';
-    selectedItem.style.boxShadow = '0 0 20px #4CAF50';
-}
-
-function modifyCreateItem() {
-    const originalCreateItem = createItem;
-    createItem = function() {
-        const itemDiv = originalCreateItem.apply(this, arguments);
-        
-        // Añadir evento de doble clic/toque
-        itemDiv.addEventListener('dblclick', function(e) {
-            e.preventDefault();
-            handleItemSelection(this);
-        });
-
-        // Para dispositivos táctiles
-        let lastTap = 0;
-        itemDiv.addEventListener('touchend', function(e) {
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            if (tapLength < 500 && tapLength > 0) {
-                e.preventDefault();
-                handleItemSelection(this);
-            }
-            lastTap = currentTime;
-        });
-
-        return itemDiv;
-    };
-}
-
-function modifySetupBins() {
-    const bins = document.querySelectorAll('.bin');
-    bins.forEach(bin => {
-        // Añadir evento de clic para los contenedores
-        bin.addEventListener('click', function() {
-            if (selectedItem) {
-                handleDrop(selectedItem, this);
-                selectedItem = null;
-            }
-        });
-
-        // Para dispositivos táctiles
-        bin.addEventListener('touchend', function(e) {
-            e.preventDefault();
-            if (selectedItem) {
-                handleDrop(selectedItem, this);
-                selectedItem = null;
-            }
-        });
-    });
-}
-
-// Modificar la función createItem para incluir la nueva funcionalidad
-function createItem() {
-    if (usedItems.size >= items.length) {
-        endGame();
-        return;
-    }
-
-    let availableItems = items.filter(item => !usedItems.has(item.name));
-    if (availableItems.length === 0) {
-        endGame();
-        return;
-    }
-
-    const randomItem = availableItems[Math.floor(Math.random() * availableItems.length)];
-    usedItems.add(randomItem.name);
-
-    const itemDiv = document.createElement('div');
-    itemDiv.className = 'item';
-    itemDiv.draggable = true;
-    itemDiv.dataset.type = randomItem.type;
-
-    // Mantener los eventos touch y drag existentes...
-    // [Todo el código existente de eventos touch y drag aquí]
-
-    // Añadir eventos de doble clic/toque
-    itemDiv.addEventListener('dblclick', function(e) {
-        e.preventDefault();
-        handleItemSelection(this);
-    });
-
-    let lastTap = 0;
-    itemDiv.addEventListener('touchend', function(e) {
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTap;
-        if (tapLength < 500 && tapLength > 0) {
-            e.preventDefault();
-            handleItemSelection(this);
-        }
-        lastTap = currentTime;
-    });
-
-    itemDiv.innerHTML = `
-        <img src="${randomItem.image}" alt="${randomItem.name}" draggable="false">
-        <div class="name">${randomItem.name}</div>
-    `;
-
-    document.getElementById('items-container').appendChild(itemDiv);
-    return itemDiv;
-}
-
-// Añadir estos estilos al CSS existente
-const style = document.createElement('style');
-style.textContent = `
-    .item.selected {
-        transform: scale(1.1);
-        box-shadow: 0 0 20px #4CAF50;
-        z-index: 1000;
-    }
-
-    .bin.highlight {
-        transform: scale(1.1);
-        box-shadow: 0 0 20px #2196F3;
-    }
-`;
-document.head.appendChild(style);
-
-// Modificar la función setupBins existente
-const originalSetupBins = setupBins;
-setupBins = function() {
-    originalSetupBins();
-    modifySetupBins();
-};
-
+        const items = [
+            { name: 'Flejes', type: 'transparent-flejes', image: 'item-flejes.png', description: 'Tiras plásticas para embalaje' },
+            { name: 'Parafina', type: 'transparent-parafina', image: 'item-parafina.png', description: 'Base de pegatina' },
+            { name: 'Cartón', type: 'blue', image: 'item-carton.png', description: 'Cajas y material de cartón' },
+            { name: 'Papel relleno', type: 'blue', image: 'item-papel.png', description: 'Papel de relleno' },
+            { name: 'Cajas', type: 'blue', image: 'item-cajas.png', description: 'Cajas de cartón' },
+            { name: 'Bolsas', type: 'blue', image: 'item-bolsas.png', description: 'Bolsas de papel' },
+            { name: 'Water tape', type: 'blue', image: 'item-watertape.png', description: 'Cinta adhesiva de agua' },
+            { name: 'Plástico', type: 'yellow', image: 'item-plastico.png', description: 'Plástico general' },
+            { name: 'Plástico duro', type: 'yellow-black', image: 'item-plastico-duro.png', description: 'Plástico resistente' },
+            { name: 'Etiquetas', type: 'brown', image: 'item-etiquetas.png', description: 'Etiquetas generales' },
+            { name: 'Papel slam', type: 'brown', image: 'item-slam.png', description: 'Papel de slam' },
+            { name: 'Datos personales', type: 'confidential', image: 'item-confidential.png', description: 'Documentos confidenciales' }
+        ];
 
         function adjustScale() {
             const screenWidth = window.innerWidth;
@@ -581,29 +473,35 @@ setupBins = function() {
 
         adjustScale();
 
-        const items = [
-            { name: 'Flejes', type: 'transparent-flejes', image: 'item-flejes.png', description: 'Tiras plásticas para embalaje' },
-            { name: 'Parafina', type: 'transparent-parafina', image: 'item-parafina.png', description: 'Base de pegatina' },
-            { name: 'Cartón', type: 'blue', image: 'item-carton.png', description: 'Cajas y material de cartón' },
-            { name: 'Papel relleno', type: 'blue', image: 'item-papel.png', description: 'Papel de relleno' },
-            { name: 'Cajas', type: 'blue', image: 'item-cajas.png', description: 'Cajas de cartón' },
-            { name: 'Bolsas', type: 'blue', image: 'item-bolsas.png', description: 'Bolsas de papel' },
-            { name: 'Water tape', type: 'blue', image: 'item-watertape.pe.png', description: 'Cinta adhesiva de agua' },
-            { name: 'Plástico', type: 'yellow', image: 'item-plastico.png', description: 'Plástico general' },
-            { name: 'Plástico duro', type: 'yellow-black', image: 'item-plastico-duro.png', description: 'Plástico resistente' },
-            { name: 'Etiquetas', type: 'brown', image: 'item-etiquetas.png', description: 'Etiquetas generales' },
-            { name: 'Papel slam', type: 'brown', image: 'item-slam.png', description: 'Papel de slam' },
-            { name: 'Datos personales', type: 'confidential', image: 'item-confidential.png', description: 'Documentos confidenciales' }
-        ];
-
-        let score = { correct: 0, incorrect: 0 };
-        let timeLeft = 30;
-        let gameInterval;
-        let usedItems = new Set();
-        let mistakes = [];
-
         function getDistance(x1, y1, x2, y2) {
             return Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+        }
+
+        // Función para manejar la selección de items
+        function handleItemSelection(itemDiv) {
+            // Si hay un item seleccionado previamente, lo deseleccionamos
+            if (selectedItem) {
+                selectedItem.classList.remove('selected');
+            }
+
+            // Si hacemos clic en el mismo item, lo deseleccionamos
+            if (selectedItem === itemDiv) {
+                selectedItem = null;
+                // Quitamos highlight de todos los bins
+                document.querySelectorAll('.bin').forEach(bin => {
+                    bin.classList.remove('highlight');
+                });
+                return;
+            }
+
+            // Seleccionamos el nuevo item
+            selectedItem = itemDiv;
+            selectedItem.classList.add('selected');
+            
+            // Resaltamos los contenedores
+            document.querySelectorAll('.bin').forEach(bin => {
+                bin.classList.add('highlight');
+            });
         }
 
         function handleDrop(itemElement, bin) {
@@ -627,6 +525,12 @@ setupBins = function() {
             setTimeout(() => {
                 bin.style.boxShadow = 'none';
             }, 500);
+
+            // Limpiar selección
+            selectedItem = null;
+            document.querySelectorAll('.bin').forEach(b => {
+                b.classList.remove('highlight');
+            });
 
             updateScore();
             itemElement.remove();
@@ -654,68 +558,100 @@ setupBins = function() {
             itemDiv.dataset.type = randomItem.type;
 
             // Variables para el manejo touch
-            let startX, startY, initialX, initialY;
+            let startX, startY;
             let active = false;
+            let isDragging = false;
+            let lastTap = 0;
 
-            // Eventos touch
+            // DOBLE TOQUE para selección (móvil)
             itemDiv.addEventListener('touchstart', function(e) {
-                e.preventDefault();
-                const touch = e.touches[0];
-                startX = touch.pageX - itemDiv.offsetLeft;
-                startY = touch.pageY - itemDiv.offsetTop;
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
                 
-                active = true;
-                itemDiv.style.position = 'absolute';
-                itemDiv.style.zIndex = '1000';
-            });
+                // Si es doble toque (menos de 300ms entre toques)
+                if (tapLength < 300 && tapLength > 0) {
+                    e.preventDefault();
+                    handleItemSelection(this);
+                    lastTap = 0; // Reset
+                    return;
+                }
+                
+                lastTap = currentTime;
+                
+                // Preparar para drag
+                const touch = e.touches[0];
+                startX = touch.pageX;
+                startY = touch.pageY;
+                isDragging = false;
+            }, { passive: false });
 
             itemDiv.addEventListener('touchmove', function(e) {
-                if (active) {
+                const touch = e.touches[0];
+                const deltaX = Math.abs(touch.pageX - startX);
+                const deltaY = Math.abs(touch.pageY - startY);
+                
+                // Si se mueve más de 10px, consideramos que es un drag
+                if (deltaX > 10 || deltaY > 10) {
+                    isDragging = true;
                     e.preventDefault();
-                    const touch = e.touches[0];
                     
-                    const currentX = touch.pageX - startX;
-                    const currentY = touch.pageY - startY;
-
-                    itemDiv.style.left = currentX + 'px';
-                    itemDiv.style.top = currentY + 'px';
+                    if (!active) {
+                        active = true;
+                        itemDiv.style.position = 'fixed';
+                        itemDiv.style.zIndex = '1000';
+                    }
+                    
+                    itemDiv.style.left = (touch.pageX - itemDiv.offsetWidth/2) + 'px';
+                    itemDiv.style.top = (touch.pageY - itemDiv.offsetHeight/2) + 'px';
                 }
-            });
+            }, { passive: false });
 
             itemDiv.addEventListener('touchend', function(e) {
-                active = false;
-                
-                const bins = document.querySelectorAll('.bin');
-                const itemRect = itemDiv.getBoundingClientRect();
-                
-                let closestBin = null;
-                let minDistance = Infinity;
-
-                bins.forEach(bin => {
-                    const binRect = bin.getBoundingClientRect();
-                    const distance = getDistance(
-                        itemRect.left + itemRect.width/2,
-                        itemRect.top + itemRect.height/2,
-                        binRect.left + binRect.width/2,
-                        binRect.top + binRect.height/2
-                    );
+                if (isDragging && active) {
+                    e.preventDefault();
+                    active = false;
                     
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestBin = bin;
-                    }
-                });
+                    const bins = document.querySelectorAll('.bin');
+                    const itemRect = itemDiv.getBoundingClientRect();
+                    
+                    let closestBin = null;
+                    let minDistance = Infinity;
 
-                if (minDistance < 100) {
-                    handleDrop(itemDiv, closestBin);
-                } else {
-                    itemDiv.style.position = 'relative';
-                    itemDiv.style.left = 'auto';
-                    itemDiv.style.top = 'auto';
+                    bins.forEach(bin => {
+                        const binRect = bin.getBoundingClientRect();
+                        const distance = getDistance(
+                            itemRect.left + itemRect.width/2,
+                            itemRect.top + itemRect.height/2,
+                            binRect.left + binRect.width/2,
+                            binRect.top + binRect.height/2
+                        );
+                        
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestBin = bin;
+                        }
+                    });
+
+                    const threshold = 150 * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale'));
+                    
+                    if (minDistance < threshold) {
+                        handleDrop(itemDiv, closestBin);
+                    } else {
+                        itemDiv.style.position = 'relative';
+                        itemDiv.style.left = 'auto';
+                        itemDiv.style.top = 'auto';
+                    }
                 }
+                isDragging = false;
+            }, { passive: false });
+
+            // DOBLE CLIC para selección (PC)
+            itemDiv.addEventListener('dblclick', function(e) {
+                e.preventDefault();
+                handleItemSelection(this);
             });
 
-            // Eventos drag and drop tradicionales
+            // Eventos drag and drop tradicionales (PC)
             itemDiv.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', randomItem.type);
                 e.target.style.opacity = '0.5';
@@ -736,6 +672,7 @@ setupBins = function() {
         function setupBins() {
             const bins = document.querySelectorAll('.bin');
             bins.forEach(bin => {
+                // Drag over (PC)
                 bin.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     bin.style.transform = 'scale(1.1)';
@@ -745,13 +682,32 @@ setupBins = function() {
                     bin.style.transform = 'scale(1)';
                 });
 
+                // Drop (PC)
                 bin.addEventListener('drop', (e) => {
                     e.preventDefault();
                     bin.style.transform = 'scale(1)';
                     const itemType = e.dataTransfer.getData('text/plain');
                     const itemElement = document.querySelector(`[data-type="${itemType}"]`);
-                    handleDrop(itemElement, bin);
+                    if (itemElement) {
+                        handleDrop(itemElement, bin);
+                    }
                 });
+
+                // Click para item seleccionado (PC y Móvil)
+                bin.addEventListener('click', function(e) {
+                    if (selectedItem) {
+                        e.preventDefault();
+                        handleDrop(selectedItem, this);
+                    }
+                });
+
+                // Touch para item seleccionado (Móvil)
+                bin.addEventListener('touchstart', function(e) {
+                    if (selectedItem) {
+                        e.preventDefault();
+                        handleDrop(selectedItem, this);
+                    }
+                }, { passive: false });
             });
         }
 
@@ -857,10 +813,15 @@ setupBins = function() {
             timeLeft = 30;
             usedItems = new Set();
             mistakes = [];
+            selectedItem = null;
             
             document.getElementById('items-container').innerHTML = '';
             document.getElementById('endGameModal').style.display = 'none';
             document.getElementById('trophy').style.display = 'none';
+            
+            document.querySelectorAll('.bin').forEach(bin => {
+                bin.classList.remove('highlight');
+            });
             
             updateScore();
             document.getElementById('timer').textContent = 'Tiempo: 30s';
